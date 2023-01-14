@@ -84,8 +84,8 @@ class IMUAnalyzer:
         #
 
         # initialize serial communications to Teensy
-        # self.driver = ti.SerialDriver(port)
-        self.driver = esp32imu.UDPDriver()
+        self.driver = ti.SerialDriver(port)
+        #self.driver = esp32imu.UDPDriver()
         time.sleep(0.1) # wait for everything to initialize
         self.driver.sendRate(500)
 
@@ -188,5 +188,6 @@ class IMUAnalyzer:
 
 if __name__ == '__main__':
     # port = ti.tools.find_teensy_or_die()
+    port = "/dev/cu.usbserial-110"
     sensor = 'accel' # 'accel' or 'gyro'
     analyzer = IMUAnalyzer(sensor)
