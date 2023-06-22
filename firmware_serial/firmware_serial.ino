@@ -88,7 +88,7 @@ void setup()
   rgbled.setColor(RGBLed::WHITE);
 
   // set up serial communication
-  Serial.begin(2000000);
+  Serial.begin(115200);
 
   init_imu();
 
