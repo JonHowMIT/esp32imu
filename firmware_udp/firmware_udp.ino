@@ -22,6 +22,14 @@ AsyncUDP udp;
 // configuration options
 //=============================================================================
 
+//esp32 PWM check
+const int M[5] = {27, 26, 25, 33, 32}; // 35?
+// setting PWM properties
+const int freq = 500;
+const int ledChannel0 = 0;
+const int ledChannel1 = 1;
+const int resolution = 12;
+
 // sensor polling interval (micros)
 uint32_t SENSOR_POLL_INTERVAL_US = 10000; // default, can be changed online
 
@@ -119,17 +127,44 @@ void setup()
     });
   }
 
+  // configure LED PWM functionalitites
+  ledcSetup(ledChannel0, freq, resolution);
+  ledcSetup(ledChannel1, freq, resolution);
+  
+  // attach the channel to the GPIO to be controlled
+  ledcAttachPin(M[0], ledChannel0);
+  ledcAttachPin(M[1], ledChannel1);
+  ledcWrite(ledChannel0, 2048);
+  ledcWrite(ledChannel1, 2048);
+  delay(1000);
+  rgbled.brightness(10); // 5% brightness
+  rgbled.setColor(RGBLed::WHITE);
+
   init_imu();
+
+  rgbled.brightness(4); // 5% brightness
+  rgbled.setColor(RGBLed::WHITE);
 }
 
 //=============================================================================
 // loop
 //=============================================================================
 
+int dutyCycle = 2048;
+int time_last = millis();
+
 void loop()
 {
   uint32_t current_time_us = micros() - start_time_us;
- 
+  if (millis() > time_last + 1000){
+    ledcWrite(ledChannel0, 3000);
+    ledcWrite(ledChannel1, 3000);
+    dutyCycle += 5;
+    if (dutyCycle > 3000) {
+      dutyCycle = 2048;
+    } 
+    time_last = millis();
+  }  
   if (current_time_us >= sensor_poll_previous_us + SENSOR_POLL_INTERVAL_US) {
 
     imu->getAGT();
