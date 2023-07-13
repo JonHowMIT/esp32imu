@@ -3,15 +3,22 @@ import time, sys
 import pyqtgraph as pg
 from PyQt6 import QtCore, QtWidgets
 
+try:
+    from PyQt6 import QtCore, QtWidgets
+except Exception:
+    from PyQt6.QtCore import Qt, QtWidgets
+
 import numpy as np
 from scipy import signal
 from scipy.fft import fft, fftfreq, fftshift
 
 import esp32imu
 
+sampling_freq = 100
+
 class IMUAnalyzer:
     # Number of samples used to calculate DFT via FFT
-    FFT_SIZE = 1024
+    FFT_SIZE = 1024*4
 
     # Window function is used since we are looking at small chunks of signal
     # as they arrive in the buffer. This makes the signal look "locally staionary".
@@ -21,7 +28,7 @@ class IMUAnalyzer:
     SAMPLE_WINDOW_SEC = 5
 
     # Plotting frequency for time-domain signals
-    SAMPLE_PLOT_FREQ_HZ = 20
+    SAMPLE_PLOT_FREQ_HZ = 10
 
     def __init__(self, sensor='accel'):
 
@@ -35,7 +42,7 @@ class IMUAnalyzer:
         self.sigwin = signal.windows.get_window(self.WINDOW, self.FFT_SIZE)
 
         # data
-        self.Fs = 1
+        self.Fs = 100
         self.last_t_us = 0
         self.t = []
         self.sensx = []
@@ -58,19 +65,19 @@ class IMUAnalyzer:
         self.app = QtWidgets.QApplication([])
         self.window = QtWidgets.QWidget()
         self.window.setWindowTitle(f"{sens} Analyzer")
-        self.window.resize(1000, 800)
+        #self.window.resize(1000, 800)
+        self.window.setGeometry( 0, 50, 1200, 800)
         # self.window.setBackground('k')
 
-        self.tdiffwin = QtWidgets.QWidget()
-        self.tdiffwin.setWindowTitle("Sample Rate")
-        self.tdiffwin.resize(1000, 800)
-
+        #self.tdiffwin = QtWidgets.QWidget()
+        #self.tdiffwin.setWindowTitle("Sample Rate")
+        #self.tdiffwin.resize(1000, 800)
 
         # create plots
         self.pw = pg.PlotWidget(title=sens)
         self.pw2 = pg.PlotWidget(title="Spectrum")
-        self.tpw = pg.PlotWidget(title="dt")
-        self.tpw2 = pg.PlotWidget(title="Sample Rate")
+        #self.tpw = pg.PlotWidget(title="dt")
+        #self.tpw2 = pg.PlotWidget(title="Sample Rate")
 
         # create the layout and add widgets
         self.layout = QtWidgets.QGridLayout()
@@ -79,13 +86,13 @@ class IMUAnalyzer:
         self.layout.addWidget(self.pw2, 1, 0)
 
         # create the layout and add widgets
-        self.layout2 = QtWidgets.QGridLayout()
-        self.tdiffwin.setLayout(self.layout2)
-        self.layout2.addWidget(self.tpw, 0, 0)
-        self.layout2.addWidget(self.tpw2, 1, 0)
+        #self.layout2 = QtWidgets.QGridLayout()
+        #self.tdiffwin.setLayout(self.layout2)
+        #self.layout2.addWidget(self.tpw, 0, 0)
+        #self.layout2.addWidget(self.tpw2, 1, 0)
 
         self.window.show()
-        self.tdiffwin.show()
+        #self.tdiffwin.show()
 
         #
         # Plotting loop
@@ -100,15 +107,15 @@ class IMUAnalyzer:
         #
 
         # initialize serial communications to Teensy
-        # self.driver = esp32imu.SerialDriver('/dev/ttyUSB0', 2000000)
-        self.driver = esp32imu.UDPDriver()
+        self.driver = esp32imu.SerialDriver('/dev/cu.usbserial-1410', 115200)
+        #self.driver = esp32imu.UDPDriver()
         time.sleep(0.1) # wait for everything to initialize
-        self.driver.sendRate(500)
+        self.driver.sendRate(sampling_freq)
 
         msg = esp32imu.RGBLedCmdMsg()
-        msg.r = 255
+        msg.r = 0
         msg.g = 0
-        msg.b = 0
+        msg.b = 255
         msg.brightness = 100
         self.driver.sendRGBLedCmd(msg)
         print(msg)
@@ -123,23 +130,35 @@ class IMUAnalyzer:
         self.driver.unregisterCallbacks()
 
     def _timer_cb(self):
-        self.pw.plot(self.t, self.sensx, pen=(1,3), clear=True)
-        self.pw.plot(self.t, self.sensy, pen=(2,3))
-        self.pw.plot(self.t, self.sensz, pen=(3,3))
-
+        self.pw.plot(self.t, self.sensx, pen='y', clear=True)
+        self.pw.plot(self.t, self.sensy, pen='g')
+        self.pw.plot(self.t, self.sensz, pen='r')
+        #self.pw.plot(self.t, self.sensx, pen=(1,3), clear=True)
+        #self.pw.plot(self.t, self.sensy, pen=(2,3))
+        #self.pw.plot(self.t, self.sensz, pen=(3,3))
+        self.pw.showGrid(x=True,y=True)
         # always keep x-axis auto range based on SAMPLE_WINDOW_SEC
         self.pw.enableAutoRange(axis=pg.ViewBox.XAxis)
 
+        (f, mag) = self._calcSpectrum(self.buf_sensx); 
+        self.pw2.plot(f[int(self.FFT_SIZE/2)+1:self.FFT_SIZE], mag[int(self.FFT_SIZE/2)+1:self.FFT_SIZE], pen=pg.mkPen(color='y', width=2), name='X', clear=True)
+        (f, mag) = self._calcSpectrum(self.buf_sensy); 
+        self.pw2.plot(f[int(self.FFT_SIZE/2)+1:self.FFT_SIZE], mag[int(self.FFT_SIZE/2)+1:self.FFT_SIZE], pen=pg.mkPen(color='g', width=2), name='Y')
+        (f, mag) = self._calcSpectrum(self.buf_sensz); 
+        self.pw2.plot(f[int(self.FFT_SIZE/2)+1:self.FFT_SIZE], mag[int(self.FFT_SIZE/2)+1:self.FFT_SIZE], pen=pg.mkPen(color='r', width=2), name='Z')
 
-        (f, mag) = self._calcSpectrum(self.buf_sensx); self.pw2.plot(f, mag, pen=(1,3), clear=True)
-        (f, mag) = self._calcSpectrum(self.buf_sensy); self.pw2.plot(f, mag, pen=(2,3))
-        (f, mag) = self._calcSpectrum(self.buf_sensz); self.pw2.plot(f, mag, pen=(3,3))
+        #(f, mag) = self._calcSpectrum(self.buf_sensx); self.pw2.plot(f, mag, pen=(1,3), name='X', clear=True)
+        #(f, mag) = self._calcSpectrum(self.buf_sensy); self.pw2.plot(f, mag, pen=(2,3), name='Y',)
+        #f, mag) = self._calcSpectrum(self.buf_sensz); self.pw2.plot(f, mag, pen=(3,3), name='Z',)
         self.pw2.enableAutoRange(axis=pg.ViewBox.XAxis)
+        self.pw2.addLegend(True)
+        self.pw2.setLogMode(x=True,y=True)
+        self.pw2.showGrid(x=True,y=True)
+        self.pw2.setRange(xRange=[-1,np.log10(self.Fs)/2.0])
+        self.pw2.setRange(yRange=[-3.5,0])
 
-
-
-        self.tpw.plot(self.t, self.dts, pen=(1,3))
-        self.tpw2.plot(self.t, self.hzs, pen=(1,3))
+        #self.tpw.plot(self.t, self.dts, pen=(1,3))
+        #self.tpw2.plot(self.t, self.hzs, pen=(1,3))
 
         # "drawnow"
         self.app.processEvents()
@@ -149,7 +168,7 @@ class IMUAnalyzer:
         self.last_t_us = msg.t_us
         hz = 1./dt
         self.Fs = hz
-        print('Got IMU at {} us ({:.0f} Hz): {:.2f}, {:.2f}, {:.2f}, \t {:.2f}, {:.2f}, {:.2f}'
+        print('Got IMU at {} us ({:.0f} Hz): {:5.2f}, {:5.2f}, {:5.2f}, \t {:5.2f}, {:5.2f}, {:5.2f}'
                 .format(msg.t_us, hz,
                         msg.accel_x, msg.accel_y, msg.accel_z,
                         msg.gyro_x, msg.gyro_y, msg.gyro_z))
@@ -164,20 +183,21 @@ class IMUAnalyzer:
             sensz = msg.gyro_z
 
         # FIFO buffer for time-domain plotting
-        self.t.append(msg.t_us / 1e6)
-        self.sensx.append(sensx)
-        self.sensy.append(sensy)
-        self.sensz.append(sensz)
-        self.dts.append(dt)
-        self.hzs.append(hz)
+        if 0 < self.Fs < 2*sampling_freq: # get rid of spurious stuff at start
+            self.t.append(msg.t_us / 1.0e6)
+            self.sensx.append(sensx)
+            self.sensy.append(sensy)
+            self.sensz.append(sensz)
+            #self.dts.append(dt)
+            #self.hzs.append(hz)
 
         if len(self.t) > hz*self.SAMPLE_WINDOW_SEC:
             self.t.pop(0)
             self.sensx.pop(0)
             self.sensy.pop(0)
             self.sensz.pop(0)
-            self.dts.pop(0)
-            self.hzs.pop(0)
+            #self.dts.pop(0)
+            #self.hzs.pop(0)
 
         # FIFO buffer for FFT
         self.buf_sensx.append(sensx)

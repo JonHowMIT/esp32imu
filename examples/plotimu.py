@@ -4,6 +4,7 @@ import pyqtgraph as pg
 from PyQt6 import QtCore, QtWidgets
 
 import esp32imu
+sampling_freq = 500
 
 At = []
 Ax = []
@@ -24,10 +25,11 @@ def imu_cb(msg):
                     msg.accel_x, msg.accel_y, msg.accel_z,
                     msg.gyro_x, msg.gyro_y, msg.gyro_z))
 
-    At.append(msg.t_us)
-    Ax.append(msg.accel_x)
-    Ay.append(msg.accel_y)
-    Az.append(msg.accel_z)
+    if 0.1*sampling_freq < hz < 2*sampling_freq: # get rid of spurious stuff at start
+        At.append(msg.t_us)
+        Ax.append(msg.accel_x)
+        Ay.append(msg.accel_y)
+        Az.append(msg.accel_z)
 
     if len(At) > hz*SAMPLE_WINDOW_SEC:
       At.pop(0)
@@ -36,13 +38,12 @@ def imu_cb(msg):
       Az.pop(0)
 
 def main():
-    # port = ti.tools.find_teensy_or_die()
-    # driver = esp32imu.SerialDriver('/dev/ttyUSB0', 2000000)
-    driver = esp32imu.UDPDriver()
+    driver = esp32imu.SerialDriver('/dev/cu.usbserial-1410', 115200)
+    # driver = esp32imu.UDPDriver()
     time.sleep(0.1)
     # could use registerCallbackIMU_NoMag or registerCallbackIMU_3DOF
     driver.registerCallbackIMU(imu_cb)
-    driver.sendRate(500)
+    driver.sendRate(sampling_freq)
 
     app = QtWidgets.QApplication([])
 
@@ -50,9 +51,9 @@ def main():
     pw = pg.plot(title="Accelerometer")
     timer = pg.QtCore.QTimer()
     def update():
-        pw.plot(At, Ax, pen=(1,3), clear=True)
-        pw.plot(At, Ay, pen=(2,3))
-        pw.plot(At, Az, pen=(3,3))
+        pw.plot(At, Ax, pen=(2,3), clear=True)
+        pw.plot(At, Ay, pen=(3,3))
+        pw.plot(At, Az, pen=(1,3))
         app.processEvents()
 
     timer.timeout.connect(update)
