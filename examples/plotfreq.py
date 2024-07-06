@@ -183,21 +183,22 @@ class IMUAnalyzer:
             sensz = msg.gyro_z
 
         # FIFO buffer for time-domain plotting
-        if 0 < self.Fs < 2*sampling_freq: # get rid of spurious stuff at start
+        if 0.5*sampling_freq < self.Fs < 2*sampling_freq: # get rid of spurious stuff at start
             self.t.append(msg.t_us / 1.0e6)
             self.sensx.append(sensx)
             self.sensy.append(sensy)
             self.sensz.append(sensz)
             #self.dts.append(dt)
             #self.hzs.append(hz)
+            #print(self.t)
 
-        if len(self.t) > hz*self.SAMPLE_WINDOW_SEC:
-            self.t.pop(0)
-            self.sensx.pop(0)
-            self.sensy.pop(0)
-            self.sensz.pop(0)
-            #self.dts.pop(0)
-            #self.hzs.pop(0)
+            if len(self.t) > hz*self.SAMPLE_WINDOW_SEC:
+                self.t.pop(0)
+                self.sensx.pop(0)
+                self.sensy.pop(0)
+                self.sensz.pop(0)
+                #self.dts.pop(0)
+                #self.hzs.pop(0)
 
         # FIFO buffer for FFT
         self.buf_sensx.append(sensx)
