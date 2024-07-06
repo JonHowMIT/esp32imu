@@ -1,5 +1,6 @@
 #!/usr/bin/python3
-import time, sys
+import time, sys, os, csv
+from os import path
 import pyqtgraph as pg
 from PyQt6 import QtCore, QtWidgets
 
@@ -38,7 +39,16 @@ def imu_cb(msg):
       Az.pop(0)
 
 def main():
-    driver = esp32imu.SerialDriver('/dev/cu.usbserial-1410', 115200)
+    ports = os.listdir("/dev/")
+    cports = [f for f in ports if f.startswith("cu.usb")]
+    try: 
+        port = "/dev/"+cports[0]
+        print(port)
+    except:
+        print("No ESP")
+        os._exit(1)
+
+    driver = esp32imu.SerialDriver(port, 115200)
     # driver = esp32imu.UDPDriver()
     time.sleep(0.1)
     # could use registerCallbackIMU_NoMag or registerCallbackIMU_3DOF
@@ -51,9 +61,9 @@ def main():
     pw = pg.plot(title="Accelerometer")
     timer = pg.QtCore.QTimer()
     def update():
-        pw.plot(At, Ax, pen=(2,3), clear=True)
-        pw.plot(At, Ay, pen=(3,3))
-        pw.plot(At, Az, pen=(1,3))
+        pw.plot(At, Ax, pen='y', clear=True)
+        pw.plot(At, Ay, pen='r')
+        pw.plot(At, Az, pen='c')
         app.processEvents()
 
     timer.timeout.connect(update)

@@ -116,7 +116,7 @@ void loop()
     esp32imu_imu_msg_t imu_msg;
     imu_msg.t_us = current_time_us;
     imu_msg.accel_x = imu->accX() * g;
-    imu_msg.accel_y = imu->accY() * g;
+    imu_msg.accel_y = 57.3*std::asin(imu->accX()/sqrt(imu->accX()*imu->accX() + imu->accZ()*imu->accZ()));
     imu_msg.accel_z = imu->accZ() * g;
     imu_msg.gyro_x = imu->gyrX() * DEG2RAD;
     imu_msg.gyro_y = imu->gyrY() * DEG2RAD;
